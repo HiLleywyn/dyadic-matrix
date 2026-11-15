@@ -15,7 +15,7 @@ target = args.dyadic.resolve() / 'core/dyadic_core/_vendor/dm_engine'
 assert (args.dyadic / 'core/pyproject.toml').is_file()
 # The hosted app supplies its own adapter and migration owner. Vendor the actual
 # shared interpreter/cursor, not a second local CLI or database initializer.
-names = ('__init__.py', 'errors.py', 'language.py', 'values.py', 'scheduling.py', 'timing.py', 'durable.py', 'LICENSE')
+names = ('__init__.py', 'errors.py', 'language.py', 'values.py', 'commands.py', 'scheduling.py', 'timing.py', 'durable.py', 'LICENSE')
 files = [root / 'src/dm_engine' / name for name in names]
 schema_path = 'core/dyadic_core/migrations/0308_matrices.sql'
 schema_hash = hashlib.sha256((root / 'src/dm_engine/schema.sql').read_bytes()).hexdigest()

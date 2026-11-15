@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "root": ".",
+  "commands": [],
+  "executables": [
+    {"program": "python3", "prefix": ["-c", "import json,sys; print(json.dumps(sys.argv[1:]))", "--"]}
+  ],
+  "max_seconds": 5
+}

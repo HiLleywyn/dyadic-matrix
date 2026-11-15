@@ -45,11 +45,21 @@ class LocalHost:
             raise Invalid('The source, plan or local policy changed; review and install the current source before effects.')
         return policy
 
+    def prepared(self,policy,row):
+        spec=decoded(row['spec'])
+        if spec['kind']=='command':return (*policy.command(spec),False)
+        if spec['kind']=='exec':
+            frozen=decoded(row['dispatch_input'])
+            if not isinstance(frozen,dict) or 'argv' not in frozen or digest(frozen['argv'])!=frozen.get('sha256'):
+                raise Invalid('The retained exec arguments are unavailable or changed.')
+            return frozen['argv'],policy.argv_command(spec,frozen['argv']),True
+        raise Invalid('No local adapter is configured for this effect.')
+
     async def start(self, conn, run, row, values):
         policy = self.verify(run);spec = decoded(row['spec'])
-        if spec['kind'] != 'command': raise Invalid('No local adapter is configured for this effect.')
-        policy.command(spec)
-        return {'state': 'waiting', 'receipt': {'dispatch': 'local_queued', 'request_id': str(row['request_id'])}}
+        self.prepared(policy,row)
+        return {'state': 'waiting', 'receipt': {'dispatch': 'local_queued', 'request_id': str(row['request_id']),
+                **({'argv_sha256':decoded(row['dispatch_input'])['sha256']} if spec['kind']=='exec' else {})}}
 
     async def reconcile(self, conn, run, row):
         # A queued claim may still be acquired. A lost process/result cannot be
@@ -79,7 +89,7 @@ class LocalHost:
             if pending is None: return None
             row = dict(pending)
             run = dict(run)
-            try: policy = self.verify(run);policy.command(decoded(row['spec']))
+            try: policy = self.verify(run);self.prepared(policy,row)
             except (Invalid, OSError):
                 await self.store._finish(conn, run, row, 'failed', {'reason': 'The reviewed local policy or working directory is unavailable. No process was started.'})
                 return run, None
@@ -94,12 +104,15 @@ class LocalHost:
         receipt = decoded(row['receipt']);process = None;reader = None;launch_requested = False
         chunks = [];size = 0;truncated = False
         try:
-            policy = self.verify(run);command, cwd = policy.command(decoded(row['spec']))
+            policy = self.verify(run);command, cwd, direct = self.prepared(policy,row)
             if await self.db.fetch_val('SELECT state FROM workspace_matrix_runs WHERE id=$1 AND user_id=$2', run['id'], self.actor) != 'running':
                 raise Invalid('The local run was paused or cancelled before process launch.')
             options = {'creationflags': subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
             launch_requested = True
-            process = await asyncio.create_subprocess_shell(command, cwd=cwd, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, **options)
+            if direct:
+                process = await asyncio.create_subprocess_exec(*command, cwd=cwd, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, **options)
+            else:
+                process = await asyncio.create_subprocess_shell(command, cwd=cwd, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, **options)
             receipt.update(pid=process.pid)
             async def read():
                 nonlocal size, truncated
@@ -138,8 +151,14 @@ class LocalHost:
             output = {'exit_code': process.returncode, 'output': text,
                       'output_truncated': truncated, **({'termination': stopped} if stopped else {})}
             state = 'completed' if process.returncode == 0 and stopped is None else 'failed'
-        except (Invalid, OSError):
-            if process is None and not launch_requested:
+        except (Invalid, OSError) as exc:
+            if process is None and launch_requested and isinstance(exc, FileNotFoundError):
+                # The subprocess owner reports failure before executing the
+                # reviewed command (for example, a vanished cwd or shell).
+                # A nonzero command exit, timeout or lost receipt is different.
+                state, output = 'failed', {'reason': 'The process could not be launched. No command was executed.'}
+                receipt.update(pre_effect_failure=True,retry_safe={'basis':'pre_effect'})
+            elif process is None and not launch_requested:
                 state, output = 'failed', {'reason': 'Local policy, process launch or run admission failed before a process was started.'}
                 receipt['pre_effect_failure'] = True
             else:

@@ -80,8 +80,10 @@ def main():
     if machine not in ('amd64', 'x86_64'): raise SystemExit('This release recipe currently supports x86-64 only.')
     system = {'Windows': 'windows', 'Linux': 'linux'}.get(platform.system())
     if not system: raise SystemExit('Build on native Windows or Linux.')
-    version = '0.1.0-alpha.1'
-    if __version__ != '0.1.0a1': raise SystemExit('Update the explicit release/PEP 440 version mapping.')
+    import re
+    release = re.fullmatch(r'(\d+\.\d+\.\d+)a([1-9]\d*)', __version__)
+    if not release: raise SystemExit('Native alpha releases require a PEP 440 alpha package version.')
+    version = release[1] + '-alpha.' + release[2]
     commit = git('rev-parse', 'HEAD')
     output = args.output.resolve()
     if output.is_relative_to(ROOT): raise SystemExit('Build output must be outside the source tree.')
@@ -108,7 +110,7 @@ def main():
             content = resolved.read_bytes();path.unlink();path.write_bytes(content)
     for name_dir in ('docs', 'examples', 'schemas'):
         shutil.copytree(ROOT / name_dir, bundle / name_dir)
-    for filename in ('README.md', 'LICENSE', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md'):
+    for filename in ('README.md', 'CHANGELOG.md', 'LICENSE', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md'):
         shutil.copyfile(ROOT / filename, bundle / filename)
     installer = 'install.ps1' if system == 'windows' else 'install.sh'
     shutil.copyfile(ROOT / 'tools' / installer, bundle / installer)

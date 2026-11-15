@@ -38,6 +38,60 @@
         "maxLength": 8192
       }
     },
+    "executables": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "program",
+          "prefix"
+        ],
+        "properties": {
+          "program": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "prefix": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    "deny_executables": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "program",
+          "prefix"
+        ],
+        "properties": {
+          "program": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "prefix": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
     "max_seconds": {
       "type": "integer",
       "minimum": 1,

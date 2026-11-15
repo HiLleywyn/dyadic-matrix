@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dm-engine"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "The auditable .dm language and durable workflow execution engine."
 readme = "README.md"
 requires-python = ">=3.12"

@@ -117,6 +117,16 @@ verifies the digest before review and records the bundle identity. Imports
 cannot read mutable files, fetch a URL or execute initializers. Exporting the
 `.dm` file preserves the complete frozen source.
 
+## Failure handling and commands
+
+`failure stop|continue`, `save outcome as name`, and `retry COUNT backoff DURATION`
+provide explicit known-failure routing and bounded durable retries. Unknown
+outcomes still require reconciliation. See the [failure contract](failure-handling.md).
+`exec "literal-program" { args ["fixed", "--", $data] }` passes bounded text
+arguments directly to a process with a separately reviewed program/prefix grant;
+see [structured arguments](commands.md). These features are part of the default
+alpha language and require no language-version declaration.
+
 ## Triggers
 
 `trigger { interval 15m }` uses UTC epoch-aligned intervals, from one minute to

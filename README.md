@@ -18,6 +18,8 @@ describes what the engine knows; it cannot prove an external effect happened.
 - [Architecture and execution logic](docs/architecture.md)
 - [Policy and adapter contract](docs/policy.md)
 - [State and schema contract](docs/state.md)
+- [Failure routing, fallback and retries](docs/failure-handling.md)
+- [Structured command arguments](docs/commands.md)
 - [Installation, packages and verification](docs/install.md)
 - [Development and reproducibility](CONTRIBUTING.md)
 - [Examples](examples/)

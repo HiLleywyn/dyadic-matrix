@@ -72,4 +72,5 @@ def test_all_real_example_plans_and_local_policy_match_the_published_schemas():
     Draft202012Validator.check_schema(plan);Draft202012Validator.check_schema(policy)
     for source in (ROOT/'examples').glob('*.dm'):
         Draft202012Validator(plan).validate(compile_source(source.read_bytes().decode()))
-    Draft202012Validator(policy).validate(json.loads((ROOT/'examples/local-policy.json').read_text()))
+    for path in (ROOT/'examples').glob('*-policy.json'):
+        Draft202012Validator(policy).validate(json.loads(path.read_text()))

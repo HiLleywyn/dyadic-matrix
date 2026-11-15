@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "root": ".",
+  "commands": ["exit 7", "echo fallback"],
+  "max_seconds": 5
+}

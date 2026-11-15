@@ -11,6 +11,7 @@ from dm_engine.durable import decoded, digest
 from dm_engine.errors import Invalid
 from dm_engine.local import LocalHost
 from dm_engine.policy import Policy
+from dm_engine.language import compile_source, review_subject
 
 
 def fixture(tmp_path, program="print('local fixture')", seconds=5):
@@ -148,6 +149,65 @@ async def test_cli_initializes_its_empty_database_with_the_bundled_schema(db):
     assert process.returncode == 0, error.decode()
     assert b'Initialized dm schema.' in out
     assert await db.fetch_one('SELECT count(*) AS n FROM workspace_matrices') == {'n': 0}
+
+
+@pytest.mark.parametrize('handling',['continue','stop'])
+async def test_known_failure_fallback_is_explicit_and_retains_original_outcome(db,tmp_path,handling):
+    source=(Path(__file__).resolve().parents[1]/'examples/fallback.dm').read_text().replace('failure continue','failure '+handling)
+    path=tmp_path/'policy.json';path.write_text(json.dumps({'format':1,'root':'.','commands':['exit 7','echo fallback'],'max_seconds':5}))
+    host,run=await start(db,path,source)
+    await host.tick()
+    record=await host.store.inspect(host.actor,run['id'])
+    assert record['steps'][0]['state']=='failed'
+    assert decoded(record['steps'][0]['output'])['exit_code']==7
+    commands=[s for s in record['steps'] if decoded(s['spec'])['kind']=='command']
+    if handling=='continue':
+        assert record['run']['state']=='completed'
+        observed=next(s for s in record['steps'] if decoded(s['spec']).get('variable')=='observed')
+        assert decoded(observed['output'])['state']=='failed'
+        assert decoded(observed['output'])['output']['exit_code']==7
+        assert commands[1]['state']=='completed' and decoded(commands[1]['output'])['output'].strip()=='fallback'
+    else:
+        assert record['run']['state']=='failed'
+        assert commands[1]['state']=='failed' and decoded(commands[1]['receipt'])['dependency_blocked']
+
+
+async def test_unknown_outcome_cannot_flow_through_failure_continue_or_start_a_fallback(db):
+    from dm_engine.durable import Matrices
+    async def authorize(conn,run):return run['user_id']==42
+    source='''matrix "unknown-handler" {
+step observe {
+ failure continue
+ on "local" { run "first" }
+ save outcome as observed
+ on "local" { run "second" }
+}
+}'''
+    graph=compile_source(source)
+    review=review_subject(graph,{})
+    store=Matrices(db,authorize=authorize)
+    definition=await store.register(42,source,{},digest(review))
+    run=await store.start(42,definition['id'],'unknown-handler')
+    class Ports:
+        resolved=False
+        def __init__(self):self.started=[]
+        async def start(self,conn,run,row,values):
+            self.started.append(row['key'])
+            return {'state':'unknown' if len(self.started)==1 else 'completed','output':{'reason':'Fixture outcome unavailable'},'receipt':{'dispatch':'fixture'}}
+        async def reconcile(self,conn,run,row):
+            return {'state':'completed','output':{'exit_code':0},'receipt':{'dispatch':'fixture','resolved':True}} if self.resolved else None
+    ports=Ports();await store.advance(run['id'],ports)
+    record=await store.inspect(42,run['id'])
+    assert record['run']['state']=='attention' and len(ports.started)==1
+    assert all(s['state']=='pending' for s in record['steps'][1:])
+    await store.reconcile(42,run['id'],ports)
+    assert len(ports.started)==1
+    ports.resolved=True
+    assert (await store.reconcile(42,run['id'],ports))['run']['state']=='paused'
+    assert len(ports.started)==1
+    await store.control(42,run['id'],'resume');await store.advance(run['id'],ports)
+    assert (await store.inspect(42,run['id']))['run']['state']=='completed'
+    assert len(ports.started)==2
 
 
 async def test_revoking_policy_while_running_terminates_the_owned_process(db, tmp_path):

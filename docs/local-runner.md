@@ -121,7 +121,8 @@ in attention until explicit resume.
 ## Adapter coverage
 
 The built-in local command host supports native data, branches, bounded iteration,
-source-local function expansion, local commands, waits, approvals and scheduling.
+source-local function expansion, local commands, structured argument vectors,
+known-failure branches, adapter-safe retries, waits, approvals and scheduling.
 Remote models, file transfer, generated proposals and installed child-workflow
 dispatch require an explicit host adapter. Unsupported effects are refused at
 review; they are never rerouted to a paid account or another computer. Dyadic's

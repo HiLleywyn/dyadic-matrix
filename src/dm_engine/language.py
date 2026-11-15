@@ -14,6 +14,9 @@ from .errors import Invalid
 MAX_SOURCE = 256 * 1024
 MAX_BLOCKS = 256
 MAX_DEPTH = 12
+MAX_RETRIES = 5
+MAX_RETRY_BACKOFF = 3600
+EFFECT_KINDS = frozenset(('command', 'exec', 'fetch', 'copy', 'ask', 'child', 'generate'))
 NAME = re.compile(r'^[A-Za-z_][A-Za-z0-9_-]{0,63}$')
 TOKEN = re.compile(r'(?P<space>[ \t\r]+)|(?P<comment>//[^\n]*|\#[^\n]*)|(?P<line>\n)|'
                    r'(?P<string>"(?:[^"\\]|\\.)*")|(?P<symbol>==|!=|[{}])|(?P<word>[^\s{}"]+)')
@@ -111,17 +114,21 @@ def compile_source(source: str) -> dict:
     inputs, variable_nodes, file_variables = [], {}, set()
     metadata, budgets = {}, {'steps': 60}
     functions, imports = {}, {}
-    expansions, plan_bytes = 0, 0
+    expansions, plan_bytes, planned_work = 0, 0, 0
 
     def fail(node, message):
         raise Invalid(f"Line {node['line']}: {message}")
 
     def emit(node, kind, after, scope, **detail):
-        nonlocal plan_bytes
+        nonlocal plan_bytes, planned_work
         if len(steps) >= budgets['steps']:
             fail(node, 'Matrix expanded steps exceed the reviewed step budget.')
         key = f'n{len(steps) + 1}'
         spec = {'key': key, 'kind': kind, 'after': list(after), 'line': node['line'], **scope, **detail}
+        if kind not in EFFECT_KINDS: spec.pop('retry', None)
+        planned_work += 1 + spec.get('retry', {}).get('limit', 0)
+        if planned_work > budgets['steps']:
+            fail(node, 'Matrix steps and possible retry attempts exceed the reviewed step budget.')
         try: plan_bytes += len(json.dumps(spec, ensure_ascii=False).encode())
         except UnicodeError: fail(node, 'Matrix values must be valid UTF-8 text.')
         if plan_bytes > 400000: fail(node, 'The expanded Matrix plan exceeds its retained-size bound.')
@@ -178,6 +185,15 @@ def compile_source(source: str) -> dict:
                 return namespace + name
             if op in ('gateway', 'profile', 'cwd') and len(w) == 2 and body is None:
                 scope[op] = w[1]
+            elif op == 'failure' and len(w) == 2 and w[1] in ('stop', 'continue') and body is None:
+                scope['failure'] = w[1]
+            elif op == 'retry' and len(w) == 4 and w[2] == 'backoff' and body is None:
+                delay = re.fullmatch(r'(\d{1,4})(s|m)', w[3])
+                if not re.fullmatch(r'\d', w[1]) or not 0 <= int(w[1]) <= MAX_RETRIES or not delay:
+                    fail(node, 'Use retry COUNT backoff DURATION, with zero to five retries and a literal seconds/minutes delay.')
+                seconds = int(delay[1]) * (60 if delay[2]=='m' else 1)
+                if not 1 <= seconds <= MAX_RETRY_BACKOFF: fail(node, 'Retry backoff starts between one second and one hour.')
+                scope['retry'] = {'limit':int(w[1]), 'backoff_seconds':seconds}
             elif op == 'step' and len(w) == 2 and body is not None:
                 label = local_name(w[1])
                 if label in labels:
@@ -251,6 +267,20 @@ def compile_source(source: str) -> dict:
                 if not scope.get('computer'):
                     fail(node, 'A command needs an explicit on "computer" block.')
                 tail = emit(node, 'command' if op == 'run' else 'fetch', tail, scope, command=w[1])
+            elif op=='exec' and len(w)==2 and body is not None:
+                from .commands import argument_prefix
+                if not scope.get('computer'):fail(node,'Exec needs an explicit on "computer" block.')
+                if not w[1] or len(w[1])>1024 or '\0' in w[1] or w[1].rstrip(' .').lower().endswith(('.cmd','.bat')):
+                    fail(node,'Choose a literal executable, not a Windows batch command.')
+                if len(body)!=1 or body[0]['words'][:1]!=['args'] or 'body' in body[0]:
+                    fail(node,'Exec contains one args [LITERAL_PREFIX, "--", DATA] statement.')
+                child=body[0];header=source[child['range']['start']:child['range']['header_end']].strip()
+                match=re.fullmatch(r'args\s+(.+)',header)
+                if not match:fail(child,'Supply the complete argument array.')
+                ir=compiled(child,match[1],aliases,bool(calls))
+                try:prefix=argument_prefix(ir,w[1])
+                except Invalid as exc:fail(child,str(exc))
+                tail=emit(node,'exec',tail,scope,executable=w[1],arguments=ir,argument_prefix=prefix)
             elif op == 'wait' and len(w) == 2 and body is None:
                 match = re.fullmatch(r'(\d+)(ms|s|m|h|d)?', w[1])
                 if not match:
@@ -268,15 +298,15 @@ def compile_source(source: str) -> dict:
                 ir = expression(node, 'let', aliases, bool(calls))
                 tail = emit(node, 'value', tail, scope, variable=name, expression=ir)
                 variables.add(name);variable_nodes[name] = tail[0];aliases[w[1]] = name
-            elif op == 'save' and len(w) == 4 and w[2] == 'as' and w[1] in ('outputs', 'response') and body is None:
+            elif op == 'save' and len(w) == 4 and w[2] == 'as' and w[1] in ('outputs', 'response', 'outcome') and body is None:
                 name = local_name(w[3])
                 if name in variables:
                     fail(node, 'Saved names must be unique identifiers.')
                 variables.add(name);aliases[w[3]] = name
                 subjects = list(tail)
-                tail = emit(node, 'save', tail, scope, variable=name, subjects=list(tail))
+                tail = emit(node, 'save', tail, scope, variable=name, subjects=list(tail), **({'projection':'outcome'} if w[1]=='outcome' else {}))
                 variable_nodes[name] = tail[0]
-                if len(subjects) == 1 and next(s for s in steps if s['key'] == subjects[0])['kind'] == 'fetch': file_variables.add(name)
+                if w[1]!='outcome' and len(subjects) == 1 and next(s for s in steps if s['key'] == subjects[0])['kind'] == 'fetch': file_variables.add(name)
             elif op == 'copy' and len(w) == 4 and w[2] == 'to' and body is None:
                 name = aliases.get(w[1], w[1])
                 if calls and w[1] not in aliases: fail(node, 'Pass copied values as explicit function parameters.')
@@ -417,6 +447,7 @@ def compile_source(source: str) -> dict:
         references = re.findall(r'\$([A-Za-z_][\w-]*)', node.get('prompt', ''))
         references += [node['variable']] if node['kind'] == 'copy' else list(node.get('input_variables', {}).values())
         if node.get('expression'): references += list(matrix_values.references(node['expression']))
+        if node.get('arguments'): references += list(matrix_values.references(node['arguments']))
         for condition in node.get('conditions', []): references += list(matrix_values.references(condition))
         if any(name in variable_nodes and variable_nodes[name] not in ancestors(node['key']) for name in references):
             raise Invalid('A saved value must come from a completed dependency, not another parallel branch.')

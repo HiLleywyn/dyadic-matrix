@@ -11,7 +11,7 @@ import uuid
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from .errors import Invalid, NotFound
-from .language import compile_source, review_subject
+from .language import compile_source, review_subject, EFFECT_KINDS, MAX_RETRY_BACKOFF
 from . import values as matrix_values
 
 OUTPUT_BYTES = 65536
@@ -37,9 +37,16 @@ def bounded(value, limit=OUTPUT_BYTES):
     try:
         text = json.dumps(value, ensure_ascii=False, default=str, allow_nan=False)
         size = len(text.encode('utf-8'))
-    except (UnicodeError, ValueError, TypeError): raise Invalid('Matrix data must be valid finite UTF-8 JSON.') from None
+    except (UnicodeError, ValueError, TypeError, RecursionError): raise Invalid('Matrix data must be valid finite UTF-8 JSON.') from None
     if size > limit:
         raise Invalid('Matrix data exceeds its retained-output bound. Store a file and pass its exact reference instead.')
+    if '\\u0000' in text:
+        pending=[json.loads(text)]
+        while pending:
+            item=pending.pop()
+            if isinstance(item,str) and '\0' in item:raise Invalid('Matrix database JSON cannot contain NUL characters.')
+            if isinstance(item,dict):pending.extend(item);pending.extend(item.values())
+            elif isinstance(item,list):pending.extend(item)
     return text
 
 
@@ -161,8 +168,9 @@ class Matrices:
                     if 'budgets' not in parent_graph: continue
                     consumed = await conn.fetchval('WITH RECURSIVE children AS (SELECT id,graph FROM workspace_matrix_runs WHERE id=$1::uuid AND user_id=$2 '
                         'UNION ALL SELECT r.id,r.graph FROM workspace_matrix_runs r JOIN children c ON r.parent_id=c.id WHERE r.user_id=$2) '
-                        "SELECT COALESCE(sum(jsonb_array_length(graph->'steps')),0) FROM children", ancestor['id'], int(user))
-                    if consumed + len(graph['steps']) > parent_graph['budgets']['steps']:
+                        "SELECT COALESCE(sum(1+COALESCE((s.value->'retry'->>'limit')::integer,0)),0) FROM children CROSS JOIN LATERAL jsonb_array_elements(graph->'steps') s", ancestor['id'], int(user))
+                    reservation = sum(1+s.get('retry',{}).get('limit',0) for s in graph['steps'])
+                    if consumed + reservation > parent_graph['budgets']['steps']:
                         raise Invalid('The ancestor Matrix aggregate step budget was reached; no child was admitted.')
             run = dict(await conn.fetchrow('INSERT INTO workspace_matrix_runs(id,user_id,matrix_id,parent_id,depth,source,source_sha256,review_sha256,graph,bindings,input,cause,request_key,request_sha256,state) '
                 'VALUES($1::uuid,$2,$3::uuid,$4::uuid,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13,$14,$15) RETURNING *',
@@ -317,16 +325,33 @@ class Matrices:
                         await self._finish(conn, run, row, 'unknown', {'reason': 'Dispatch receipt unavailable. Reconcile; do not repeat.'})
                     continue
                 if status == 'waiting':
-                    if spec['kind'] == 'wait':
+                    retry = decoded(row['receipt']).get('_matrix_retry', {})
+                    if retry.get('next_at'):
+                        if row['wake_at'] > clock: continue
+                        retry = {**retry, 'attempt':retry['attempt']+1, 'attempt_id':str(uuid.uuid4()), 'admitted_at':clock.isoformat()}
+                        retry.pop('next_at')
+                        receipt = {'_matrix_retry':retry}
+                        await conn.execute("UPDATE workspace_matrix_steps SET state='pending',receipt=$3::jsonb,output=NULL,wake_at=NULL,lease_until=NULL,finished_at=NULL WHERE run_id=$1 AND key=$2", run['id'], row['key'], bounded(receipt))
+                        row.update(state='pending',receipt=receipt,output=None)
+                        await self._event(conn, run, 'retry_ready', step=row['key'], attempt=retry['attempt'], attempt_id=retry['attempt_id'])
+                    elif spec['kind'] == 'wait':
                         if row['wake_at'] <= clock: await self._finish(conn, run, row, 'completed', {'waited_until': row['wake_at'].isoformat()})
+                        continue
                     else:
                         result = await ports.reconcile(conn, run, row)
-                        if result is not None: await self._finish(conn, run, row, result['state'], result.get('output'), result.get('receipt'))
-                    continue
+                        if result is not None: await self._finish(conn, run, row, result['state'], result.get('output'), result.get('receipt'), now=clock)
+                        continue
                 parents = [state[k] for k in spec['after']]
-                if any(p['state'] in ('failed', 'unknown') for p in parents):
-                    await self._finish(conn, run, row, 'failed', {'reason': 'A dependency failed or has an uncertain outcome.'});continue
-                if any(p['state'] not in ('completed', 'skipped') for p in parents): continue
+                if any(p['state']=='unknown' for p in parents):
+                    # Keep unstarted descendants pending. Reconciliation can
+                    # resolve the original effect, followed by explicit resume;
+                    # no synthetic descendant receipt should need reconciling.
+                    continue
+                def handled(parent):
+                    return parent['state']=='failed' and decoded(parent['spec']).get('failure')=='continue' and not decoded(parent['receipt']).get('dependency_blocked')
+                if any(p['state']=='failed' and not handled(p) for p in parents):
+                    await self._finish(conn, run, row, 'failed', {'reason': 'An unhandled dependency failed.'}, {'dependency_blocked': True});continue
+                if any(p['state'] not in ('completed', 'skipped') and not handled(p) for p in parents): continue
                 if spec.get('conditions'):
                     try:
                         if decoded(run['graph']).get('expression_version') != matrix_values.VERSION:
@@ -372,7 +397,9 @@ class Matrices:
                     if row['state'] == 'completed': values[spec['variable']] = output
                     continue
                 if spec['kind'] == 'save':
-                    outputs = [decoded(state[k]['output']) for k in spec['subjects']]
+                    outputs = [({'state':state[k]['state'], 'output':decoded(state[k]['output']),
+                                 'request_id':str(state[k]['request_id']), 'receipt':decoded(state[k]['receipt'])}
+                                if spec.get('projection')=='outcome' else decoded(state[k]['output'])) for k in spec['subjects']]
                     output = outputs[0] if len(outputs) == 1 else outputs
                     await self._finish(conn, run, row, 'completed', output);values[spec['variable']] = output;continue
                 if spec['kind'] == 'approval':
@@ -382,12 +409,29 @@ class Matrices:
                         **({'generated_file_id': proposal['file_id'], 'source_sha256': proposal['source_sha256']} if proposal else {})});continue
                 # The adapter writes any dispatch identity before returning, inside
                 # this transaction when its owner supports atomic admission.
-                await self._event(conn, run, 'dispatch_requested', step=row['key'], request_id=str(row['request_id']), source_sha256=run['source_sha256'], step_kind=spec['kind'])
+                if spec['kind']=='exec':
+                    from .commands import resolve_argv,validate_argv
+                    try:
+                        frozen=decoded(row['dispatch_input'])
+                        if frozen is None:
+                            argv=resolve_argv(spec,values);frozen={'argv':argv,'sha256':digest(argv)}
+                            await conn.execute('UPDATE workspace_matrix_steps SET dispatch_input=$3::jsonb WHERE run_id=$1 AND key=$2',run['id'],row['key'],bounded(frozen))
+                            row['dispatch_input']=frozen
+                        if digest(validate_argv(spec,frozen['argv']))!=frozen['sha256']:raise Invalid('The frozen exec arguments changed.')
+                    except (Invalid,KeyError,TypeError) as exc:
+                        await self._finish(conn,run,row,'failed',{'reason':'Exec argument data is invalid or changed. No process was started.'},{'pre_effect_failure':True});continue
+                attempt = {}
+                if spec.get('retry',{}).get('limit'):
+                    receipt = dict(decoded(row['receipt']))
+                    attempt = receipt.setdefault('_matrix_retry', {'attempt':1, 'attempt_id':str(uuid.uuid4()), 'admitted_at':clock.isoformat(), 'history':[]})
+                    await conn.execute('UPDATE workspace_matrix_steps SET receipt=$3::jsonb WHERE run_id=$1 AND key=$2',run['id'],row['key'],bounded(receipt))
+                    row['receipt'] = receipt
+                await self._event(conn, run, 'dispatch_requested', step=row['key'], request_id=str(row['request_id']), source_sha256=run['source_sha256'], step_kind=spec['kind'], **({'attempt':attempt['attempt'],'attempt_id':attempt['attempt_id']} if attempt else {}))
                 try: result = await ports.start(conn, run, row, values)
                 except (Invalid, NotFound): result = {'state': 'unknown', 'output': {'reason': 'A reviewed resource or capability is unavailable. Inspect it before resuming.'}}
-                await self._finish(conn, run, row, result['state'], result.get('output'), result.get('receipt'))
-            pending = await conn.fetchval("SELECT count(*) FROM workspace_matrix_steps WHERE run_id=$1 AND state NOT IN ('completed','skipped')", run['id'])
-            failed = await conn.fetchval("SELECT count(*) FROM workspace_matrix_steps WHERE run_id=$1 AND state='failed'", run['id'])
+                await self._finish(conn, run, row, result['state'], result.get('output'), result.get('receipt'), now=clock)
+            pending = await conn.fetchval("SELECT count(*) FROM workspace_matrix_steps WHERE run_id=$1 AND state NOT IN ('completed','skipped') AND NOT (state='failed' AND COALESCE(spec->>'failure','stop')='continue' AND COALESCE(receipt->>'dependency_blocked','false')<>'true')", run['id'])
+            failed = await conn.fetchval("SELECT count(*) FROM workspace_matrix_steps WHERE run_id=$1 AND state='failed' AND (COALESCE(spec->>'failure','stop')<>'continue' OR COALESCE(receipt->>'dependency_blocked','false')='true')", run['id'])
             attention = await conn.fetchval("SELECT count(*) FROM workspace_matrix_steps WHERE run_id=$1 AND state IN ('unknown','approval')", run['id'])
             active = await conn.fetchval("SELECT count(*) FROM workspace_matrix_steps WHERE run_id=$1 AND state IN ('dispatching','waiting')", run['id'])
             final = 'attention' if attention else 'failed' if failed and not active else 'completed' if not pending else 'running'
@@ -395,14 +439,40 @@ class Matrices:
                 await conn.execute('UPDATE workspace_matrix_runs SET state=$2,updated_at=now() WHERE id=$1', run['id'], final)
                 await self._event(conn, run, final)
 
-    async def _finish(self, conn, run, row, state, output=None, receipt=None):
+    async def _finish(self, conn, run, row, state, output=None, receipt=None, *, now=None):
+        clock = now_at(now);spec = decoded(row['spec']);wake = None
+        supplied = receipt if isinstance(receipt, dict) else {}
+        receipt = dict(receipt or decoded(row['receipt']))
+        attempt = decoded(row['receipt']).get('_matrix_retry')
+        if attempt: receipt['_matrix_retry'] = dict(attempt)
+        else: receipt.pop('_matrix_retry', None)
         try: encoded = bounded(output) if output is not None else None
         except Invalid:
-            state, output = 'failed', {'reason': 'Output exceeded the Matrix retention bound. Inspect the retained effect receipt; dependent steps did not run.', 'output_sha256': digest(output)}
+            try: rejected_hash=digest(output)
+            except (ValueError,TypeError,RecursionError):rejected_hash=None
+            state, output = 'failed', {'reason': 'Output cannot be retained as bounded database JSON. Inspect the retained effect receipt; dependent steps did not run.', 'output_sha256': rejected_hash}
             encoded = bounded(output)
+            supplied = {}  # A completed effect with excess output is never retry-safe.
+        if attempt and state in ('completed','failed','unknown'):
+            attempt = receipt['_matrix_retry']
+            attempt['history'] = [*attempt['history'], {'attempt':attempt['attempt'],'attempt_id':attempt['attempt_id'],
+                'state':state,'observed_at':clock.isoformat(),'output_sha256':digest(output),
+                'receipt':{k:supplied[k] for k in ('dispatch','job_id','request_id','claim_id','argv_sha256','pre_effect_failure','retry_safe') if k in supplied}}]
+            authority = supplied.get('retry_safe', {})
+            basis = authority.get('basis') if isinstance(authority,dict) else None
+            safe = basis=='pre_effect' and supplied.get('pre_effect_failure') is True or (
+                basis=='idempotent' and authority.get('key')==str(row['request_id']) and
+                isinstance(authority.get('contract'),str) and 1 <= len(authority['contract']) <= 128)
+            if state=='failed' and spec['kind'] in EFFECT_KINDS and safe and attempt['attempt']<=spec['retry']['limit']:
+                delay = min(MAX_RETRY_BACKOFF, spec['retry']['backoff_seconds'] * 2**(attempt['attempt']-1))
+                wake = clock + timedelta(seconds=delay)
+                attempt['next_at'] = wake.isoformat();state = 'waiting'
+                await self._event(conn,run,'retry_wait',step=row['key'],attempt=attempt['attempt'],attempt_id=attempt['attempt_id'],
+                                  next_at=wake.isoformat(),basis=basis,output_sha256=digest(output))
         ended = state in ('completed', 'skipped', 'failed')
         await conn.execute('UPDATE workspace_matrix_steps SET state=$3,output=$4::jsonb,receipt=$5::jsonb,started_at=COALESCE(started_at,now()),'
-            'finished_at=CASE WHEN $6 THEN now() ELSE finished_at END,updated_at=now() WHERE run_id=$1 AND key=$2',
-            run['id'], row['key'], state, encoded, bounded(receipt or decoded(row['receipt'])), ended)
-        row.update(state=state,output=output,receipt=receipt or decoded(row['receipt']))
-        await self._event(conn, run, 'step', step=row['key'], state=state, receipt=receipt or {}, output_sha256=digest(output) if output is not None else None)
+            'finished_at=CASE WHEN $6 THEN now() ELSE finished_at END,wake_at=COALESCE($7,wake_at),lease_until=CASE WHEN $7::timestamptz IS NOT NULL THEN NULL ELSE lease_until END,updated_at=now() WHERE run_id=$1 AND key=$2',
+            run['id'], row['key'], state, encoded, bounded(receipt), ended, wake)
+        row.update(state=state,output=output,receipt=receipt)
+        if wake is not None:row['wake_at']=wake
+        await self._event(conn, run, 'step', step=row['key'], state=state, receipt=receipt, output_sha256=digest(output) if output is not None else None)

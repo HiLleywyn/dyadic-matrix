@@ -51,6 +51,7 @@
           "kind": {
             "enum": [
               "command",
+              "exec",
               "fetch",
               "copy",
               "ask",
@@ -81,6 +82,51 @@
             "type": "array",
             "items": {
               "$ref": "#/$defs/expression"
+            }
+          },
+          "executable": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "arguments": {
+            "$ref": "#/$defs/expression"
+          },
+          "argument_prefix": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "failure": {
+            "enum": [
+              "stop",
+              "continue"
+            ]
+          },
+          "projection": {
+            "const": "outcome"
+          },
+          "retry": {
+            "type": "object",
+            "required": [
+              "limit",
+              "backoff_seconds"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5
+              },
+              "backoff_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600
+              }
             }
           },
           "iterations": {
