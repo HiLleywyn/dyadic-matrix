@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dm-engine"
+version = "0.1.0a1"
+description = "The auditable .dm language and durable workflow execution engine."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "HiLleywyn"}]
+keywords = ["workflow", "durable-execution", "parser", "matrix", "dyadic", "cli"]
+dependencies = []
+
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.29,<1"]
+test = ["pytest>=8,<10", "pytest-asyncio>=0.23,<2", "asyncpg>=0.29,<1"]
+
+[project.scripts]
+dm = "dm_engine.cli:main"
+
+[project.urls]
+Documentation = "https://dyadic.app/developers/matrix/"
+Source = "https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693"
+Mirror = "https://github.com/HiLleywyn/dyadic-matrix"
+Issues = "https://github.com/HiLleywyn/dyadic-matrix/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dm_engine = ["schema.sql", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
