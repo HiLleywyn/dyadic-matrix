@@ -12,6 +12,10 @@ from .values import compile_expression, evaluate
 
 
 def main(argv=None):
+    # Native Windows executables can otherwise inherit a legacy console code
+    # page even when redirected. JSON/data output has one portable encoding.
+    for stream in (sys.stdout,sys.stderr):
+        if hasattr(stream,'reconfigure'):stream.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser(prog='dm', description=__doc__)
     parser.add_argument('--version', action='version', version='dm ' + __version__)
     commands = parser.add_subparsers(dest='command', required=True)

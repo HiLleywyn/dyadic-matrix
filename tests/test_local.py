@@ -117,8 +117,10 @@ async def test_timeout_or_explicit_cancel_joins_the_real_local_process(db, tmp_p
 
 async def test_real_cli_review_install_run_inspect_and_idempotent_request_key(db, tmp_path):
     path, source, _ = fixture(tmp_path, "from pathlib import Path\np=Path('effect.txt')\np.write_text(p.read_text()+'x' if p.exists() else 'x')")
+    source=source.replace('matrix "local-fixture" {','matrix "local-fixture" {\ninput payload')
     file = tmp_path/'workflow.dm';file.write_text(source, encoding='utf-8')
-    env = {**os.environ, 'DM_DATABASE_URL':db.test_dsn, 'PYTHONPATH':str(Path(__file__).resolve().parents[1]/'src')}
+    values=tmp_path/'inputs.json';values.write_text(json.dumps({'payload':'λ 🌿'}),encoding='utf-8')
+    env = {**os.environ, 'DM_DATABASE_URL':db.test_dsn, 'PYTHONIOENCODING':'ascii', 'PYTHONPATH':str(Path(__file__).resolve().parents[1]/'src')}
     async def cli(*args, success=True):
         executable = [os.environ['DM_TEST_EXECUTABLE']] if os.environ.get('DM_TEST_EXECUTABLE') else [sys.executable, '-m', 'dm_engine']
         proc = await asyncio.create_subprocess_exec(*executable, *map(str,args), env=env,
@@ -130,13 +132,14 @@ async def test_real_cli_review_install_run_inspect_and_idempotent_request_key(db
     await cli('install', file, '--policy', path, '--review', 'wrong', '--yes', success=False)
     assert not (tmp_path/'effect.txt').exists()
     definition = await cli('install', file, '--policy', path, '--review', review['review_sha256'], '--yes', '--json')
-    first = await cli('run', definition['id'], '--policy', path, '--review', review['review_sha256'], '--request-key', 'cli-once', '--yes', '--json')
+    first = await cli('run', definition['id'], '--policy', path, '--review', review['review_sha256'], '--input-file', values, '--request-key', 'cli-once', '--yes', '--json')
     assert first['run']['state'] == 'running' and not (tmp_path/'effect.txt').exists()
     await cli('worker', '--once', '--policy', path, '--json')
-    again = await cli('run', definition['id'], '--policy', path, '--review', review['review_sha256'], '--request-key', 'cli-once', '--yes', '--json')
+    again = await cli('run', definition['id'], '--policy', path, '--review', review['review_sha256'], '--input-file', values, '--request-key', 'cli-once', '--yes', '--json')
     assert first['run']['id'] == again['run']['id']
     record = await cli('inspect', first['run']['id'], '--policy', path, '--json')
     assert record['run']['state'] == 'completed' and (tmp_path/'effect.txt').read_text() == 'x'
+    assert decoded(record['run']['input'])=={'payload':'λ 🌿'}
 
 
 @pytest.mark.parametrize('db', [False], indirect=True)

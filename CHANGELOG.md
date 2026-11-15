@@ -10,6 +10,7 @@
 - `exec` sends frozen, bounded text arguments to a literal program without shell
   interpolation. Local policies grant its exact program/prefix separately.
 - Aggregate budgets reserve possible retry work, including nested workflows.
+- CLI JSON uses UTF-8 consistently, including redirected native Windows output.
 - Invalid database JSON, including NUL and cyclic effect output, fails before
   dependent work; output retention failure does not grant replay safety.
 
