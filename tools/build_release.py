@@ -40,7 +40,12 @@ def licenses(destination):
         except metadata.PackageNotFoundError: continue
         found = []
         for relative in distribution.files or ():
-            if any(part.lower().startswith(('license', 'copying', 'notice')) for part in relative.parts):
+            # Some Python packages contain a functional module named "licenses".
+            # Copy legal texts from metadata, never source/cache files from that
+            # module (which can retain a build machine's private filenames).
+            legal = relative.parts[0].endswith('.dist-info') and (
+                'licenses' in relative.parts or relative.name.lower().startswith(('license', 'copying', 'notice')))
+            if legal and relative.suffix.lower() not in ('.py', '.pyc', '.pyo', '.pyd', '.dll', '.so'):
                 source = Path(distribution.locate_file(relative))
                 if source.is_file():
                     target = destination / name / Path(*relative.parts)
