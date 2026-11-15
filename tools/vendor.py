@@ -27,6 +27,6 @@ for source in files:
     else:
         target.mkdir(parents=True, exist_ok=True);destination.write_bytes(content)
 if not args.check:
-    (target.parent / '__init__.py').write_text('"""Pinned external components, verified by their source manifests."""\n', encoding='utf-8')
-    (target.parent / 'dm-engine.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    (target.parent / '__init__.py').write_text('"""Pinned external components, verified by their source manifests."""\n', encoding='utf-8', newline='\n')
+    (target.parent / 'dm-engine.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
 print('Verified' if args.check else 'Vendored', len(files), 'engine files')
