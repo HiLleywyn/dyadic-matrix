@@ -1,0 +1,14 @@
+{
+  "cpython-3.14.3-license.rst": {
+    "source": "https://raw.githubusercontent.com/python/cpython/v3.14.3/Doc/license.rst",
+    "sha256": "c695d550b135e53e38807e76496d1db17d22c40e461d1f3f354c86188d3305dd"
+  },
+  "cpython-3.13.18-license.rst": {
+    "source": "https://raw.githubusercontent.com/python/cpython/v3.13.18/Doc/license.rst",
+    "sha256": "952ac05720d7f1dcb63589b35eb0931b1442eb250230a4ad31198eddf0ad6abc"
+  },
+  "openssl-3.0.18-LICENSE.txt": {
+    "source": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0.18/LICENSE.txt",
+    "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+  }
+}

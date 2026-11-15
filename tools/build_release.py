@@ -58,6 +58,15 @@ def licenses(destination):
     python_license = next((p for p in candidates if p.is_file()), None)
     if python_license is None: raise RuntimeError('Cannot locate CPython license text')
     shutil.copyfile(python_license, destination / 'CPython-LICENSE.txt')
+    shutil.copytree(ROOT / 'tools/third-party', destination / 'upstream')
+    if sys.platform == 'linux':
+        system = destination / 'system-libraries';system.mkdir()
+        names = ('libssl3', 'libbz2-1.0', 'libffi8', 'liblzma5', 'libuuid1', 'zlib1g')
+        versions = subprocess.check_output(['dpkg-query', '-W', *names], text=True)
+        (system / 'versions.txt').write_text(versions, encoding='utf-8')
+        for name in names:
+            shutil.copyfile(Path('/usr/share/doc') / name / 'copyright', system / (name + '-copyright'))
+        shutil.copytree('/usr/share/common-licenses', system / 'common-licenses', symlinks=False)
     return included
 
 
@@ -99,7 +108,7 @@ def main():
             content = resolved.read_bytes();path.unlink();path.write_bytes(content)
     for name_dir in ('docs', 'examples', 'schemas'):
         shutil.copytree(ROOT / name_dir, bundle / name_dir)
-    for filename in ('README.md', 'LICENSE', 'CONTRIBUTING.md'):
+    for filename in ('README.md', 'LICENSE', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md'):
         shutil.copyfile(ROOT / filename, bundle / filename)
     installer = 'install.ps1' if system == 'windows' else 'install.sh'
     shutil.copyfile(ROOT / 'tools' / installer, bundle / installer)
