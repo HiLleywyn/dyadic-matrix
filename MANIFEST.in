@@ -1,0 +1,6 @@
+include LICENSE README.md CONTRIBUTING.md .gitattributes
+recursive-include docs *.md
+recursive-include examples *.dm *.json
+recursive-include schemas *.json
+recursive-include tools *.py *.txt *.ps1 *.sh Dockerfile.release
+recursive-include tests *.py

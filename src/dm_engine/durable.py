@@ -264,10 +264,10 @@ class Matrices:
                     queued += 1
             return {'accepted': True, 'duplicate': False, 'queued': queued}
 
-    async def tick(self, ports, *, now=None):
+    async def tick(self, ports, *, now=None, actor=None):
         clock = now_at(now)
         async with self.db.atomic() as conn:
-            definitions = await conn.fetch('SELECT * FROM workspace_matrices WHERE enabled AND next_at<=$1 ORDER BY next_at FOR UPDATE SKIP LOCKED LIMIT 32', clock)
+            definitions = await conn.fetch('SELECT * FROM workspace_matrices WHERE enabled AND next_at<=$1 AND ($2::bigint IS NULL OR user_id=$2) ORDER BY next_at FOR UPDATE SKIP LOCKED LIMIT 32', clock, actor)
             remaining = {}
             for definition in definitions:
                 user = definition['user_id']
@@ -277,7 +277,7 @@ class Matrices:
                     definition['user_id'], definition['id'], 'schedule:' + str(definition['id']) + ':' + definition['next_at'].isoformat(), definition['review_sha256'], 'schedule')
                 await conn.execute('UPDATE workspace_matrices SET next_at=$2 WHERE id=$1', definition['id'], next_trigger(decoded(definition['triggers']), clock))
                 remaining[user] -= 1
-        pending = await self.db.fetch_all("SELECT * FROM workspace_matrix_invocations WHERE state='pending' ORDER BY checked_at,created_at LIMIT 32")
+        pending = await self.db.fetch_all("SELECT * FROM workspace_matrix_invocations WHERE state='pending' AND ($1::bigint IS NULL OR user_id=$1) ORDER BY checked_at,created_at LIMIT 32", actor)
         for item in pending:
             await self.db.execute('UPDATE workspace_matrix_invocations SET checked_at=now() WHERE user_id=$1 AND request_key=$2', item['user_id'], item['request_key'])
             definition = await self.definition(item['user_id'], str(item['matrix_id']))
@@ -291,7 +291,7 @@ class Matrices:
                 await self.db.execute("UPDATE workspace_matrix_invocations SET state='blocked',reason=$3 WHERE user_id=$1 AND request_key=$2", item['user_id'], item['request_key'], str(exc)[:400])
                 continue
             await self.db.execute("UPDATE workspace_matrix_invocations SET state='delivered' WHERE user_id=$1 AND request_key=$2", item['user_id'], item['request_key'])
-        active = await self.db.fetch_all("SELECT id FROM workspace_matrix_runs WHERE state='running' ORDER BY updated_at LIMIT 64")
+        active = await self.db.fetch_all("SELECT id FROM workspace_matrix_runs WHERE state='running' AND ($1::bigint IS NULL OR user_id=$1) ORDER BY updated_at LIMIT 64", actor)
         for run in active:
             await self.advance(str(run['id']), ports, now=clock)
 

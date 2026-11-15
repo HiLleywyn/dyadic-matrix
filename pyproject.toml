@@ -11,11 +11,11 @@ requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [{name = "HiLleywyn"}]
 keywords = ["workflow", "durable-execution", "parser", "matrix", "dyadic", "cli"]
-dependencies = []
+dependencies = ["tzdata>=2025.2"]
 
 [project.optional-dependencies]
 postgres = ["asyncpg>=0.29,<1"]
-test = ["pytest>=8,<10", "pytest-asyncio>=0.23,<2", "asyncpg>=0.29,<1"]
+test = ["pytest>=8,<10", "pytest-asyncio>=0.23,<2", "asyncpg>=0.29,<1", "jsonschema>=4.23,<5"]
 
 [project.scripts]
 dm = "dm_engine.cli:main"
@@ -35,3 +35,4 @@ dm_engine = ["schema.sql", "LICENSE"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

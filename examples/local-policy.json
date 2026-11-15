@@ -1,0 +1,7 @@
+{
+  "format": 1,
+  "root": ".",
+  "commands": ["echo local-checkpoint"],
+  "deny_commands": [],
+  "max_seconds": 10
+}

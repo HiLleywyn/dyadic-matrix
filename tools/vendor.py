@@ -13,7 +13,7 @@ parser.add_argument('--dev', action='store_true')
 args = parser.parse_args()
 target = args.dyadic.resolve() / 'core/dyadic_core/_vendor/dm_engine'
 assert (args.dyadic / 'core/pyproject.toml').is_file()
-files = sorted((root / 'src/dm_engine').glob('*.py')) + [root / 'src/dm_engine/schema.sql']
+files = sorted((root / 'src/dm_engine').glob('*.py')) + [root / 'src/dm_engine/schema.sql', root / 'src/dm_engine/LICENSE']
 manifest = {'source': 'https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693',
             'mirror': 'https://github.com/HiLleywyn/dyadic-matrix', 'revision': None, 'files': {}}
 if not args.dev:

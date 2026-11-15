@@ -1,0 +1,5 @@
+# Native release builds, installed into an isolated virtual environment.
+PyInstaller==6.22.3
+asyncpg==0.31.0
+tzdata==2026.6
+build==1.6.1

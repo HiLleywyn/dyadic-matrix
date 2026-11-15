@@ -62,3 +62,14 @@ def test_cli_validate_never_executes_and_invalid_input_has_a_failure_exit(capsys
     assert 'No effects dispatched' in capsys.readouterr().out
     invalid = tmp_path/'invalid.dm';invalid.write_text('matrix "x" { python "danger" }')
     assert main(['validate', str(invalid)]) == 2
+
+
+def test_all_real_example_plans_and_local_policy_match_the_published_schemas():
+    import json
+    from jsonschema import Draft202012Validator
+    plan = json.loads((ROOT/'schemas/plan.schema.json').read_text())
+    policy = json.loads((ROOT/'schemas/policy.schema.json').read_text())
+    Draft202012Validator.check_schema(plan);Draft202012Validator.check_schema(policy)
+    for source in (ROOT/'examples').glob('*.dm'):
+        Draft202012Validator(plan).validate(compile_source(source.read_bytes().decode()))
+    Draft202012Validator(policy).validate(json.loads((ROOT/'examples/local-policy.json').read_text()))

@@ -1,4 +1,4 @@
-"""Matrix v2 interval/cron calculation; the existing durable trigger queue owns delivery.
+"""Matrix interval/cron calculation; the durable trigger queue owns delivery.
 
 Five numeric cron fields: minute, hour, day, month, weekday (Sunday 0 or 7).
 No shell command, environment settings, randomness, network or terminal timer.
