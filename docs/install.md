@@ -36,7 +36,7 @@ adapter. The package includes IANA time-zone data for portable schedule checks.
 
 ## Release packages
 
-Download from [canonical Releases](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693/releases)
+Download from [canonical Releases](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693?tab=releases)
 or [GitHub Releases](https://github.com/HiLleywyn/dyadic-matrix/releases).
 The release version `0.1.0-alpha.1` maps to Python package version `0.1.0a1`;
 this is an application release number, not a language opt-in.
