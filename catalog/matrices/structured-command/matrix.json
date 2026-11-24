@@ -1,0 +1,19 @@
+{
+  "id": "structured-command",
+  "name": "Structured Command",
+  "description": "Pass JSON input to a fixed Python program as data, with explicit known-failure routing and bounded pre-effect retries.",
+  "version": "1.2.0",
+  "icon": "terminal",
+  "color": "blue",
+  "abilities": [
+    "Freeze typed command arguments without shell interpolation",
+    "Inspect a retained outcome and branch on known failure",
+    "Retry only adapter-established safe pre-effect failures"
+  ],
+  "permissions": [
+    "Requires a paired Runner 2.10.0 or newer and Python 3",
+    "Review the exact computer, program and argument prefix",
+    "No model calls; no automatic repair or publishing"
+  ],
+  "changes": [{"version": "1.2.0", "notes": "Initial structured-argument, known-failure and safe-retry walkthrough."}]
+}

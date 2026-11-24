@@ -1,0 +1,33 @@
+{
+  "id": "weekly-brief",
+  "name": "Weekly Operations Brief",
+  "description": "Reconcile delivery, KPI and decision inputs, cross-check claims, then prepare an operations brief for review.",
+  "version": "1.2.0",
+  "icon": "layers",
+  "color": "amber",
+  "abilities": [
+    "Produces: reconciled KPI ledger, exceptions and decisions, a sourced brief, and a review checklist.",
+    "Use native structured data and a reviewed step budget without shell interpolation"
+  ],
+  "permissions": [
+    "Requires: approved local delivery.json, metrics.json and decisions.md; each file must be UTF-8 and at most 128 KiB.",
+    "Configure: operations-host, /srv/dyadic/operations-inputs, diagnostics and analyst profiles, and the reporting period in the source files.",
+    "AI analysis uses the selected gateway and profile and may incur model charges.",
+    "Import is inert. Resolve targets, review the exact source and save before running.",
+    "No deployment, restart, deletion, sending or publication is included."
+  ],
+  "changes": [
+    {
+      "version": "1.2.0",
+      "notes": "Explicit failure-stop behavior and default alpha execution contract. Bounded retry for adapter-established safe pre-effect failures on computers; no retry authority from command output."
+    },
+    {
+      "version": "1.1.0",
+      "notes": "Full alpha language update: native structured data, explicit budgets and reviewed control flow; no language opt-in."
+    },
+    {
+      "version": "1.0.0",
+      "notes": "Initial operational collection, analysis, cross-check and approval workflow."
+    }
+  ]
+}

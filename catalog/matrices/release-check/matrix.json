@@ -1,0 +1,33 @@
+{
+  "id": "release-check",
+  "name": "Release Readiness Review",
+  "description": "Collect repository, dependency and CI evidence, assess release risk, then review a sourced release recommendation.",
+  "version": "1.2.0",
+  "icon": "layers",
+  "color": "blue",
+  "abilities": [
+    "Produces: repository-state summary, CI evidence ledger, risk assessment and a release recommendation.",
+    "Use native structured data and a reviewed step budget without shell interpolation"
+  ],
+  "permissions": [
+    "Requires: a trusted checkout with Git, Python 3 and npm; a separate CI host with the last completed reports.",
+    "Configure: build-machine and ci-machine, /srv/project and /srv/ci/reports, and diagnostics/analyst profiles.",
+    "AI analysis uses the selected gateway and profile and may incur model charges.",
+    "Import is inert. Resolve targets, review the exact source and save before running.",
+    "No deployment, restart, deletion, sending or publication is included."
+  ],
+  "changes": [
+    {
+      "version": "1.2.0",
+      "notes": "Explicit failure-stop behavior and default alpha execution contract. Bounded retry for adapter-established safe pre-effect failures on computers; no retry authority from command output."
+    },
+    {
+      "version": "1.1.0",
+      "notes": "Full alpha language update: native structured data, explicit budgets and reviewed control flow; no language opt-in."
+    },
+    {
+      "version": "1.0.0",
+      "notes": "Initial operational collection, analysis, cross-check and approval workflow."
+    }
+  ]
+}

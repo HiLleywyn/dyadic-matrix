@@ -1,0 +1,33 @@
+{
+  "id": "security-review",
+  "name": "Repository Security Triage",
+  "description": "Collect repository and lockfile context, triage a bounded reported finding, then prepare a reproducible review handoff.",
+  "version": "1.2.0",
+  "icon": "layers",
+  "color": "coral",
+  "abilities": [
+    "Produces: provenance ledger, affected-path analysis, evidence gaps and a prioritized verification handoff.",
+    "Use native structured data and a reviewed step budget without shell interpolation"
+  ],
+  "permissions": [
+    "Requires: a trusted local Git checkout plus finding.json describing an authorized, bounded issue report.",
+    "Configure: review-host, /srv/dyadic/security-review and least-privileged diagnostics/analyst profiles.",
+    "AI analysis uses the selected gateway and profile and may incur model charges.",
+    "Import is inert. Resolve targets, review the exact source and save before running.",
+    "No deployment, restart, deletion, sending or publication is included."
+  ],
+  "changes": [
+    {
+      "version": "1.2.0",
+      "notes": "Explicit failure-stop behavior and default alpha execution contract. Bounded retry for adapter-established safe pre-effect failures on computers; no retry authority from command output."
+    },
+    {
+      "version": "1.1.0",
+      "notes": "Full alpha language update: native structured data, explicit budgets and reviewed control flow; no language opt-in."
+    },
+    {
+      "version": "1.0.0",
+      "notes": "Initial operational collection, analysis, cross-check and approval workflow."
+    }
+  ]
+}

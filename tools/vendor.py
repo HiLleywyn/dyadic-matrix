@@ -45,7 +45,22 @@ for source in files:
         if not destination.is_file() or destination.read_bytes() != content: raise SystemExit('Vendored engine differs: ' + source.name)
     else:
         target.mkdir(parents=True, exist_ok=True);destination.write_bytes(content)
+
+dm_matrices = root / 'catalog' / 'matrices'
+dyadic_matrices = args.dyadic.resolve() / 'catalog' / 'matrices'
+matrix_count = 0
+if dm_matrices.is_dir():
+    for src in sorted(p for p in dm_matrices.rglob('*') if p.is_file()):
+        rel = src.relative_to(dm_matrices)
+        content = src.read_text(encoding='utf-8').replace('\r\n', '\n').encode('utf-8')
+        dst = dyadic_matrices / rel
+        if args.check:
+            if not dst.is_file() or dst.read_text(encoding='utf-8').replace('\r\n', '\n').encode('utf-8') != content:
+                raise SystemExit('Store matrix differs from dm: ' + rel.as_posix())
+        else:
+            dst.parent.mkdir(parents=True, exist_ok=True);dst.write_bytes(content)
+        matrix_count += 1
 if not args.check:
     (target.parent / '__init__.py').write_text('"""Pinned external components, verified by their source manifests."""\n', encoding='utf-8', newline='\n')
     (target.parent / 'dm-engine.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
-print('Verified' if args.check else 'Vendored', len(files), 'engine files')
+print('Verified' if args.check else 'Vendored', len(files), 'engine files', f'and {matrix_count} store matrix files' if matrix_count else '')
