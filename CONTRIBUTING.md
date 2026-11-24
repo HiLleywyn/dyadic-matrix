@@ -26,6 +26,14 @@ Keep fixtures bounded and deterministic. No implicit model charges, production
 commands, external sends or credential access belong in a test. Record runtime
 and toolchain versions for native packaging. Build Windows and Linux separately,
 test the installed commands and attach checksums/source provenance to releases.
+## Branching and Release Promotion (`nightly` vs `main`)
+
+- `main`: reviewed public release baseline matching tagged releases and verified Dyadic parity.
+- `nightly`: unreleased development/parity tracking branch aligned with upstream Dyadic Matrix changes. Clearly mark commits on `nightly` as unreleased; never treat `nightly` as a public release.
+- Promoting `nightly` to `main`:
+  1. Run `python tools/promote_release.py --dyadic ../Dyadic` and verify the full `lley.cat` CI suite (all engine + PostgreSQL + conformance + boundary tests, 0 skipped, 0 failed).
+  2. Reconcile `CHANGELOG.md`, `pyproject.toml`, `schemas/`, and `tools/vendor.py` before fast-forwarding or merging to `main` and tagging a release.
+
 GitHub is a secondary source mirror; its Actions are disabled for this project.
 
 Contributions to project-authored code and docs use the repository MIT license.

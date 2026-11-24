@@ -176,6 +176,8 @@ class LocalHost:
 
     async def record(self, run, row, state, output, receipt):
         async with self.db.atomic() as conn:
+            # Lock the run before the step to match advance()/claim() lock ordering and avoid deadlocks.
+            await conn.fetchrow('SELECT id FROM workspace_matrix_runs WHERE id=$1 AND user_id=$2 FOR UPDATE', run['id'], self.actor)
             active = await conn.fetchrow('SELECT * FROM workspace_matrix_steps WHERE run_id=$1 AND key=$2 AND user_id=$3 FOR UPDATE', run['id'], row['key'], self.actor)
             if active and active['state'] in ('dispatching', 'unknown') and active['request_id'] == row['request_id'] and decoded(active['receipt']).get('claim_id') == receipt.get('claim_id'):
                 await self.store._finish(conn, run, dict(active), state, output, receipt)

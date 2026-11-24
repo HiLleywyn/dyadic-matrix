@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "programs": [
+    {
+      "id": "pure-branch-and-loop",
+      "source": "matrix \"conformance-loop\" {\n    input count\n    let doubled = $count * 2\n    if $doubled > 4 {\n        repeat 2 {\n            print \"high\"\n        }\n    } else {\n        print \"low\"\n    }\n}\n",
+      "source_sha256": "102d3fc88005bdc77a501dbef9136938c6c902727c27d7bf8da11f25135e4b7b",
+      "plan_sha256": "0431d75dea113c050040f02fcae5b68ac89dd32de6ece4e21dbfc00210b84adc",
+      "step_kinds": [
+        "value",
+        "value",
+        "print",
+        "value",
+        "print",
+        "print"
+      ]
+    },
+    {
+      "id": "unicode-and-bounded-budget",
+      "source": "matrix \"conformance-unicode\" {\n    budget steps 12\n    step first {\n        print \"ok 🚀\"\n    }\n    wait 15s\n}\n",
+      "source_sha256": "024aaf67b5306de962e1b3b3979fc0eb0572075f0452027c91a2ee540a178081",
+      "plan_sha256": "73bad08f79a7c21a9908d8d58518247b1f32d0e28328911b75b8d365ea4204bf",
+      "step_kinds": [
+        "print",
+        "wait"
+      ]
+    }
+  ],
+  "expressions": [
+    {
+      "expr": "sum(map(filter($readings, $item.ok == true), $item.count * 2))",
+      "inputs": {
+        "readings": [
+          {
+            "ok": true,
+            "count": 3
+          },
+          {
+            "ok": false,
+            "count": 9
+          },
+          {
+            "ok": true,
+            "count": 4
+          }
+        ]
+      },
+      "expected": 14
+    },
+    {
+      "expr": "text(object([\"b\", 2], [\"a\", 1]))",
+      "inputs": {},
+      "expected": "{\"a\":1,\"b\":2}"
+    },
+    {
+      "expr": "sort($rows, $item.n)",
+      "inputs": {
+        "rows": [
+          {
+            "k": "b",
+            "n": 2
+          },
+          {
+            "k": "a",
+            "n": 1
+          }
+        ]
+      },
+      "expected": [
+        {
+          "k": "a",
+          "n": 1
+        },
+        {
+          "k": "b",
+          "n": 2
+        }
+      ]
+    }
+  ],
+  "invalid_sources": [
+    "matrix \"bad\" { exec \"id\" }",
+    "matrix \"bad\" { python { 1 + 1 } }",
+    "matrix \"bad\" { repeat 33 { print \"too many\" } }",
+    "matrix \"bad\" { wait forever }"
+  ],
+  "invalid_expressions": [
+    "1 / 0",
+    "open('/etc/passwd')",
+    "__import__('os').system('id')",
+    "min([])"
+  ]
+}
