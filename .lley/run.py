@@ -57,10 +57,13 @@ def disposable_postgres(env: dict[str, str]):
 
 
 def verify_junit(report_path: Path) -> None:
-    """Reject empty, zero-passed, failed, errored, or silently skipped runs."""
+    """Reject empty, malformed, zero-passed, failed, errored, or silently skipped runs."""
     if not report_path.is_file():
         raise RuntimeError(f"Missing JUnit report: {report_path}")
-    root = ET.parse(report_path).getroot()
+    try:
+        root = ET.parse(report_path).getroot()
+    except ET.ParseError as exc:
+        raise RuntimeError(f"Malformed JUnit report {report_path}: {exc}") from exc
     cases = list(root.iter("testcase"))
     failures = sum(1 for c in cases if c.find("failure") is not None)
     errors = sum(1 for c in cases if c.find("error") is not None)
@@ -79,6 +82,7 @@ def main() -> int:
     (ROOT / ".ci-tmp").mkdir(exist_ok=True)
     env = clean_environment()
     report_path = REPORTS / "engine.xml"
+    report_path.unlink(missing_ok=True)
 
     with disposable_postgres(env) as db_env:
         res = subprocess.run(
