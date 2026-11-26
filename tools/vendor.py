@@ -21,8 +21,8 @@ schema_path = 'core/dyadic_core/migrations/0308_matrices.sql'
 schema_hash = hashlib.sha256((root / 'src/dm_engine/schema.sql').read_bytes()).hexdigest()
 if hashlib.sha256((args.dyadic / schema_path).read_bytes()).hexdigest() != schema_hash:
     raise SystemExit('The platform migration and portable schema differ; reconcile their explicit schema contracts first.')
-manifest = {'source': 'https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693',
-            'mirror': 'https://github.com/HiLleywyn/dyadic-matrix', 'revision': None,
+manifest = {'source': 'https://github.com/HiLleywyn/dyadic-matrix',
+            'mirror': 'https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693', 'revision': None,
             'platform_schema': {'path': schema_path, 'sha256': schema_hash}, 'files': {}}
 if not args.dev:
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=root): raise SystemExit('Commit the engine before vendoring its revision.')

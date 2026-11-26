@@ -22,8 +22,8 @@ dm = "dm_engine.cli:main"
 
 [project.urls]
 Documentation = "https://dyadic.app/developers/matrix/"
-Source = "https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693"
-Mirror = "https://github.com/HiLleywyn/dyadic-matrix"
+Source = "https://github.com/HiLleywyn/dyadic-matrix"
+Mirror = "https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693"
 Issues = "https://github.com/HiLleywyn/dyadic-matrix/issues"
 
 [tool.setuptools.packages.find]

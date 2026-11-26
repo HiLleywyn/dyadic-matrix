@@ -118,8 +118,8 @@ def main():
     dependencies = licenses(bundle / 'third-party')
     files = {p.relative_to(bundle).as_posix(): sha(p) for p in sorted(bundle.rglob('*')) if p.is_file()}
     manifest = {'format': 1, 'version': version, 'python_package_version': __version__, 'source_commit': commit,
-                'canonical_source': 'https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693',
-                'github_mirror': 'https://github.com/HiLleywyn/dyadic-matrix',
+                'canonical_source': 'https://github.com/HiLleywyn/dyadic-matrix',
+                'mirror': 'https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693',
                 'platform': system, 'architecture': 'x86_64', 'python': platform.python_version(),
                 'libc': platform.libc_ver() if system == 'linux' else None,
                 'dependencies': dependencies, 'files': files}
