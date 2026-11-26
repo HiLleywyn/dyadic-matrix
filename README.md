@@ -11,8 +11,8 @@ describes what the engine knows; it cannot prove an external effect happened.
 
 ## Source and documentation
 
-- [Canonical source on lley.cat](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693)
-- [GitHub mirror](https://github.com/HiLleywyn/dyadic-matrix)
+- [Canonical source on GitHub](https://github.com/HiLleywyn/dyadic-matrix)
+- [lley.cat mirror](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693)
 - [Dyadic developer guide](https://dyadic.app/developers/matrix/)
 - [Language and syntax](docs/language.md)
 - [Architecture and execution logic](docs/architecture.md)
@@ -41,13 +41,13 @@ dm validate examples/iteration.dm --json
 dm expr 'sum(map($readings, $item.count))' --input-file examples/readings.json
 ```
 
-The lley.cat Git remote is
+The lley.cat mirror Git remote is
 `https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693.git`.
 Both remotes carry the same engine history. Versioned Windows and Linux
 install packages, checksums and source revision manifests belong in Releases;
 the release installer instructions distinguish an available package from a
-verified installation. Builds run locally and in the existing build environment,
-with no dependency on GitHub Actions.
+verified installation. Builds run locally and across both GitHub Actions and
+the lley.cat delivery environment.
 
 ## Run a local workflow
 

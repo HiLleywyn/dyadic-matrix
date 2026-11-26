@@ -1,8 +1,8 @@
 # Install and verify
 
 Source repositories:
-[lley.cat](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693)
-and [GitHub](https://github.com/HiLleywyn/dyadic-matrix).
+[GitHub](https://github.com/HiLleywyn/dyadic-matrix) (canonical)
+and [lley.cat](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693) (mirror).
 The hosted guide is [Dyadic Matrix](https://dyadic.app/developers/matrix/).
 
 ## Source installation
@@ -36,8 +36,8 @@ adapter. The package includes IANA time-zone data for portable schedule checks.
 
 ## Release packages
 
-Download from [canonical Releases](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693?tab=releases)
-or [GitHub Releases](https://github.com/HiLleywyn/dyadic-matrix/releases).
+Download from [GitHub Releases](https://github.com/HiLleywyn/dyadic-matrix/releases)
+or [lley.cat Releases](https://git.lley.cat/r/9ae6eb36-985a-4fd3-a22a-6449cdf47693?tab=releases).
 The release version `0.1.0-alpha.2` maps to Python package version `0.1.0a2`;
 this is an application release number, not a language opt-in.
 
@@ -54,7 +54,7 @@ or silently download another build when integrity verification fails.
 
 Windows can calculate an archive digest using
 `Get-FileHash FILE -Algorithm SHA256`; Linux can use `sha256sum FILE`.
-The release build does not use GitHub Actions. Native Windows and isolated Linux
+GitHub Actions validates source, PostgreSQL tests, and examples on push; native Windows and isolated Linux release
 builds are tested separately before their artifacts receive the same source tag.
 
 Verify the downloaded archive against `SHA256SUMS` obtained from the release.

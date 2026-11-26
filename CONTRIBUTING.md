@@ -34,7 +34,7 @@ test the installed commands and attach checksums/source provenance to releases.
   1. Run `python tools/promote_release.py --dyadic ../Dyadic` and verify the full `lley.cat` CI suite (all engine + PostgreSQL + conformance + boundary tests, 0 skipped, 0 failed).
   2. Reconcile `CHANGELOG.md`, `pyproject.toml`, `schemas/`, and `tools/vendor.py` before fast-forwarding or merging to `main` and tagging a release.
 
-GitHub is a secondary source mirror; its Actions are disabled for this project.
+GitHub (`HiLleywyn/dyadic-matrix`) is the canonical source repository, and `git.lley.cat` is its synchronized mirror; both GitHub Actions and `lley.cat` Actions validate pushes automatically.
 
 Contributions to project-authored code and docs use the repository MIT license.
 Preserve third-party notices and identify upstream provenance when importing code.
