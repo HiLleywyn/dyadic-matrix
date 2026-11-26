@@ -1,10 +1,11 @@
 # Development and verification
 
 Install Python 3.12 or newer and `python -m pip install -e '.[test]'`.
-Run `python -m pytest` for the standalone suite. Compile every source under
+Run `python -m pytest tests` for the standalone suite. Compile every source under
 `examples/` with `dm validate`; evaluate data without granting external effects.
-PostgreSQL tests require an explicitly supplied disposable test DSN and use
-fixture-owned schemas. Never point them at production or an account database.
+PostgreSQL tests require an explicitly supplied disposable `DM_TEST_DSN` and use
+fixture-owned schemas; without it they are skipped (`.lley/run.py` rejects any skip).
+Never point them at production or an account database.
 
 Change the authoritative engine here, then synchronize its exact reviewed files
 into Dyadic with `tools/vendor.py`. A release records the engine commit and file
@@ -31,10 +32,10 @@ test the installed commands and attach checksums/source provenance to releases.
 - `main`: reviewed public release baseline matching tagged releases and verified Dyadic parity.
 - `nightly`: unreleased development/parity tracking branch aligned with upstream Dyadic Matrix changes. Clearly mark commits on `nightly` as unreleased; never treat `nightly` as a public release.
 - Promoting `nightly` to `main`:
-  1. Run `python tools/promote_release.py --dyadic ../Dyadic` and verify the full `lley.cat` CI suite (all engine + PostgreSQL + conformance + boundary tests, 0 skipped, 0 failed).
+  1. Run `python tools/promote_release.py --dyadic ../Dyadic` (a dry run unless `--execute` is given; `--expected-main-sha` guards against a moved `main`) and confirm CI passes with PostgreSQL: all engine, conformance and boundary tests, 0 skipped, 0 failed.
   2. Reconcile `CHANGELOG.md`, `pyproject.toml`, `schemas/`, and `tools/vendor.py` before fast-forwarding or merging to `main` and tagging a release.
 
-GitHub (`HiLleywyn/dyadic-matrix`) is the canonical source repository, and `git.lley.cat` is its synchronized mirror; both GitHub Actions and `lley.cat` Actions validate pushes automatically.
+GitHub (`HiLleywyn/dyadic-matrix`) is the canonical source repository and `git.lley.cat` is its synchronized mirror. `.github/workflows/ci.yml` validates every push and pull request; `.lley/pipeline.json` runs the same checks through `.lley/run.py engine` on the mirror's runner.
 
 Contributions to project-authored code and docs use the repository MIT license.
 Preserve third-party notices and identify upstream provenance when importing code.
